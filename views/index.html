@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Booking</title>
+    <style>
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Available Slots</h1>
+    <div id="slots">
+      <button onclick="openForm('14:00:00')">2:00 PM</button>
+      <button onclick="openForm('14:30:00')">2:30 PM</button>
+      <button onclick="openForm('15:00:00')">3:00 PM</button>
+      <button onclick="openForm('16:00:00')">4:00 PM</button>
+    </div>
+
+    <h1>Book a Meeting</h1>
+    <form id="bookingForm" class="hidden">
+      <input type="hidden" id="slotTime" name="slotTime" />
+      <label for="name">Name:</label>
+      <input type="text" id="name" name="name" required />
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required />
+      <button type="submit">Book Meeting</button>
+    </form>
+
+    <div id="message"></div>
+
+    <h2>Scheduled Meetings</h2>
+    <ul id="meetingList"></ul>
+
+    <script>
+      let selectedSlot;
+
+      function openForm(slotTime) {
+        selectedSlot = slotTime;
+        document.getElementById("slotTime").value = slotTime;
+        document.getElementById("bookingForm").classList.remove("hidden");
+      }
+
+      document
+        .getElementById("bookingForm")
+        .addEventListener("submit", function (event) {
+          event.preventDefault();
+          const name = document.getElementById("name").value;
+          const email = document.getElementById("email").value;
+
+          fetch("/api/book", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slotTime: selectedSlot, name, email }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              document.getElementById(
+                "message"
+              ).innerHTML = `Meeting booked! Link: ${data.meetingLink}`;
+              loadMeetings();
+              document.getElementById("bookingForm").classList.add("hidden"); // Hide form after booking
+            });
+        });
+
+      function loadMeetings() {
+        fetch("/api/meetings")
+          .then((response) => response.json())
+          .then((data) => {
+            const meetingList = document.getElementById("meetingList");
+            meetingList.innerHTML = "";
+            data.forEach((meeting) => {
+              meetingList.innerHTML += `<li>${meeting.name} - ${meeting.slot_time} - ${meeting.meeting_link} 
+          <button onclick="cancelMeeting(${meeting.id})">Cancel</button></li>`;
+            });
+          });
+      }
+
+      function cancelMeeting(meetingId) {
+        fetch(`/api/cancel/${meetingId}`, { method: "DELETE" })
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("message").innerHTML = data.message;
+            loadMeetings();
+          });
+      }
+
+      loadMeetings();
+    </script>
+  </body>
+</html>
