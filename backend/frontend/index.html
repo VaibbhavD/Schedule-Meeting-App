@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Booking App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+
+      h1 {
+        color: #333;
+      }
+
+      .slot {
+        margin: 10px 0;
+        padding: 10px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+      }
+
+      .slot:hover {
+        background-color: #f0f0f0;
+      }
+
+      #booking-form {
+        display: none;
+        margin-top: 20px;
+      }
+
+      .meeting {
+        margin: 10px 0;
+        padding: 10px;
+        border: 1px solid #ccc;
+      }
+
+      .meeting button {
+        margin-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Book a Meeting Slot</h1>
+    <div id="available-slots"></div>
+
+    <h2>Schedule a Meeting</h2>
+    <form id="booking-form">
+      <input type="text" id="name" placeholder="Enter your name" required />
+      <input type="email" id="email" placeholder="Enter your email" required />
+      <input type="hidden" id="slot_time" />
+      <button type="submit">Book Meeting</button>
+    </form>
+
+    <h2>All Meetings</h2>
+    <div id="meetings"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+      let selectedSlotTime = "";
+
+      async function getAvailableSlots() {
+        const res = await axios.get(
+          "http://localhost:4000/appointments/available-slots"
+        );
+        const availableSlotsContainer =
+          document.getElementById("available-slots");
+
+        if (res.data.length === 0) {
+          availableSlotsContainer.innerHTML = "<p>No slots available.</p>";
+          return;
+        }
+
+        availableSlotsContainer.innerHTML = res.data
+          .map(
+            (slot) =>
+              `<div class="slot" onclick="selectSlot('${slot.slot_time}')">
+                ${slot.slot_time} - ${slot.available_slots} meeting(s) left
+              </div>`
+          )
+          .join("");
+      }
+
+      async function getMeetings() {
+        const res = await axios.get(
+          "http://localhost:4000/appointments/meetings"
+        );
+        const meetingsContainer = document.getElementById("meetings");
+
+        if (res.data.length === 0) {
+          meetingsContainer.innerHTML = "<p>No meetings scheduled yet.</p>";
+          return;
+        }
+        console.log(res.data);
+        meetingsContainer.innerHTML = res.data
+          .map(
+            (meeting) => `
+            <div class="meeting">
+              ${meeting.name} - ${meeting.slot_time} - 
+              <a href="${meeting.meeting_link}" target="_blank">"${meeting.meeting_link}"</a>
+              <button onclick="cancelMeeting(${meeting.id})">Cancel</button>
+            </div>`
+          )
+          .join("");
+      }
+
+      function selectSlot(slotTime) {
+        selectedSlotTime = slotTime;
+        document.getElementById("slot_time").value = slotTime;
+        document.getElementById("booking-form").style.display = "block";
+      }
+
+      document
+        .getElementById("booking-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const name = document.getElementById("name").value;
+          const email = document.getElementById("email").value;
+          const slot_time = document.getElementById("slot_time").value;
+
+          try {
+            const res = await axios.post(
+              "http://localhost:4000/appointments/book-slot",
+              {
+                name,
+                email,
+                slot_time,
+              }
+            );
+
+            console.log(res);
+            // Show a popup with meeting details
+            alert(
+              `Meeting booked successfully!\n\nName: ${name}\nEmail: ${email}\nSlot Time: ${slot_time}\nMeeting Link: ${res.data.meeting.meeting_link}`
+            );
+
+            // Reset form and hide it
+            document.getElementById("name").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("booking-form").style.display = "none";
+
+            // Refresh slots and meetings
+            getAvailableSlots();
+            getMeetings();
+          } catch (err) {
+            console.error(err);
+            alert("Failed to book the meeting.");
+          }
+        });
+
+      async function cancelMeeting(id) {
+        try {
+          await axios.delete(
+            `http://localhost:4000/appointments/cancel-meeting/${id}`
+          );
+          getMeetings();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to cancel the meeting.");
+        }
+      }
+
+      // Initial load
+      getAvailableSlots();
+      getMeetings();
+    </script>
+  </body>
+</html>
